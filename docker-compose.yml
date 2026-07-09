@@ -1,0 +1,38 @@
+services:
+  backend:
+    build: ./backend
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opsagent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsagent}
+      POSTGRES_DB: ${POSTGRES_DB:-opsagent}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  n8n_data:

@@ -1,0 +1,42 @@
+{
+  "uid": "opsagent_webhooks",
+  "type": "webhooks",
+  "config": {
+    "settings": {
+      "targetUrl": "https://sponsors-appear-hepatitis-traditional.trycloudflare.com/webhooks/hubspot/lead",
+      "maxConcurrentRequests": 10
+    },
+    "subscriptions": {
+      "crmObjects": [
+        {
+          "subscriptionType": "object.creation",
+          "objectType": "contact",
+          "active": true
+        },
+        {
+          "subscriptionType": "object.propertyChange",
+          "objectType": "contact",
+          "propertyName": "firstname",
+          "active": false
+        }
+      ],
+      "legacyCrmObjects": [
+        {
+          "subscriptionType": "contact.propertyChange",
+          "propertyName": "lastname",
+          "active": false
+        },
+        {
+          "subscriptionType": "contact.deletion",
+          "active": false
+        }
+      ],
+      "hubEvents": [
+        {
+          "subscriptionType": "contact.privacyDeletion",
+          "active": false
+        }
+      ]
+    }
+  }
+}

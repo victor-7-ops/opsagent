@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id         String   @id @default(uuid())
+  hubspotId  String   @unique @map("hubspot_id")
+  status     String   @default("received")
+  assignedTo String?  @map("assigned_to")
+  score      Int?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("leads")
+}
+
+model Deal {
+  id                String    @id @default(uuid())
+  hubspotId         String    @unique @map("hubspot_id")
+  stage             String
+  lastStageChangeAt DateTime? @map("last_stage_change_at")
+  followupSentAt    DateTime? @map("followup_sent_at")
+
+  @@map("deals")
+}
+
+model Ticket {
+  id             String   @id @default(uuid())
+  source         String
+  severity       String?
+  category       String?
+  validityFlag   String?  @map("validity_flag")
+  responseDraft  String?  @map("response_draft")
+  status         String   @default("received")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  slaAlerts SlaAlert[]
+
+  @@map("tickets")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  type      String
+  refId     String   @map("ref_id")
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("activity_log")
+}
+
+model HubspotToken {
+  id                 String   @id @default(uuid())
+  accessTokenCipher  String   @map("access_token_cipher")
+  refreshTokenCipher String   @map("refresh_token_cipher")
+  expiresAt          DateTime @map("expires_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("hubspot_tokens")
+}
+
+model SlaAlert {
+  id          String    @id @default(uuid())
+  ticketId    String    @map("ticket_id")
+  breachedAt  DateTime  @map("breached_at")
+  notifiedAt  DateTime? @map("notified_at")
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  @@map("sla_alerts")
+}

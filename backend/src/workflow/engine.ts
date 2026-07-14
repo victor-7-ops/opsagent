@@ -1,5 +1,6 @@
 import { EventEmitter } from "events";
 import { prisma } from "../db/client";
+import { writeAuditLog } from "./audit";
 import { findTransition, WorkflowEvent, WorkflowState } from "./states";
 
 export class IllegalTransitionError extends Error {
@@ -67,13 +68,12 @@ export class WorkflowEngine extends EventEmitter {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          workflowId,
-          actor,
-          event: "state_transition",
-          detail: { from, to, event } as object,
-        },
+      await writeAuditLog({
+        workflowId,
+        actor,
+        client: tx,
+        event: "state_transition",
+        detail: { from, to, event },
       });
 
       const detail: TransitionEventDetail = { workflowId, from, to, event };

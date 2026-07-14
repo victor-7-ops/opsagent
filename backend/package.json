@@ -8,6 +8,7 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
@@ -23,6 +24,7 @@
     "@types/node": "^20.14.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.2",
-    "prisma": "^5.16.1"
+    "prisma": "^5.16.1",
+    "vitest": "^1.6.0"
   }
 }

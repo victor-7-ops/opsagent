@@ -73,3 +73,52 @@ model SlaAlert {
 
   @@map("sla_alerts")
 }
+
+// --- v2: agentic workflow engine (additive, see SPEC.md §3) ---
+
+model Workflow {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  triggerType       String   @map("trigger_type")
+  triggerPayload    Json     @map("trigger_payload")
+  state             String   @default("TRIAGED")
+  plan              Json?
+  planSummary       String?  @map("plan_summary")
+  approvedBy        String?  @map("approved_by")
+  notifierMessageRef String? @map("notifier_message_ref")
+  error             String?
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  steps WorkflowStep[]
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflowId     String    @map("workflow_id") @db.Uuid
+  stepIndex      Int       @map("step_index")
+  tool           String
+  args           Json
+  idempotencyKey String    @unique @map("idempotency_key")
+  status         String    @default("pending")
+  result         Json?
+  attempts       Int       @default(0)
+  executedAt     DateTime? @map("executed_at") @db.Timestamptz(6)
+
+  workflow Workflow @relation(fields: [workflowId], references: [id])
+
+  @@unique([workflowId, stepIndex])
+  @@map("workflow_steps")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  workflowId String?  @map("workflow_id") @db.Uuid
+  actor      String
+  event      String
+  detail     Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("audit_log")
+}

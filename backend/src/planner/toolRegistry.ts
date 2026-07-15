@@ -115,7 +115,7 @@ export function isRegisteredTool(name: string): boolean {
 // JSON Schema for a single tool's args — used when injecting the registry
 // into the planner prompt (SPEC.md §5.2).
 export function toolArgsJsonSchema(tool: ToolDef): object {
-  return zodToJsonSchema(tool.argsSchema, tool.name);
+  return zodToJsonSchema(tool.argsSchema as z.ZodTypeAny, tool.name);
 }
 
 // The full registry as JSON Schema, keyed by tool name, for prompt injection.

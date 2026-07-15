@@ -74,6 +74,28 @@ describe("TelegramNotifier", () => {
       "Telegram sendMessage failed (400): chat not found",
     );
   });
+
+  it("sendFailureSummary posts a plain (no-keyboard) message with the failed step and error", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true, result: {} }) });
+    const notifier = new TelegramNotifier();
+
+    await notifier.sendFailureSummary("wf-1", "hubspot.update_contact", "HubSpot API error (500): timeout");
+
+    const [, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.text).toContain("wf-1");
+    expect(body.text).toContain("hubspot.update_contact");
+    expect(body.text).toContain("HubSpot API error (500): timeout");
+    expect(body.reply_markup).toBeUndefined();
+  });
+
+  it("sendFailureSummary throws when credentials are missing", async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const notifier = new TelegramNotifier();
+    await expect(notifier.sendFailureSummary("wf-1", "tool", "err")).rejects.toThrow(
+      "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID is not set",
+    );
+  });
 });
 
 describe("getNotifier", () => {

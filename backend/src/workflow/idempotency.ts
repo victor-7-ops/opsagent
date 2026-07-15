@@ -31,9 +31,17 @@ interface IdempotentRunResult<T> {
 
 // Wraps a single outbound (side-effecting) action with idempotency guarantees:
 // - a `workflow_steps` row is the source of truth for whether this exact step
-//   has already run
-// - a step already `succeeded` is skipped and its stored result is returned —
-//   re-running the executor on any workflow is always a no-op for completed steps
+//   has already run. The row's true identity is (workflowId, stepIndex) — a
+//   step slot can only ever have one row (schema's @@unique constraint) —
+//   not idempotencyKey alone, which changes if a resumed run resolves
+//   templated args differently than a prior attempt (e.g. a step that was
+//   marked "skipped" during a halt, then genuinely attempted on resume).
+//   Upserting by idempotencyKey when the row already exists under a
+//   different key for that slot violates the (workflowId, stepIndex)
+//   uniqueness — caught via live testing, not the mocked test suite.
+// - a step already `succeeded` under the SAME idempotencyKey is skipped and
+//   its stored result is returned — re-running the executor on any workflow
+//   is always a no-op for completed steps with unchanged args
 // - a step without a resolvable idempotency key never runs
 export async function runIdempotent<T>(
   step: StepIdentity,
@@ -42,14 +50,17 @@ export async function runIdempotent<T>(
   const idempotencyKey = computeIdempotencyKey(step);
   if (!idempotencyKey) throw new MissingIdempotencyKeyError();
 
-  const existing = await prisma.workflowStep.findUnique({ where: { idempotencyKey } });
+  const slot = { workflowId: step.workflowId, stepIndex: step.stepIndex };
+  const existing = await prisma.workflowStep.findUnique({
+    where: { workflowId_stepIndex: slot },
+  });
 
-  if (existing?.status === "succeeded") {
+  if (existing?.status === "succeeded" && existing.idempotencyKey === idempotencyKey) {
     return { result: existing.result as T, skipped: true };
   }
 
   const row = await prisma.workflowStep.upsert({
-    where: { idempotencyKey },
+    where: { workflowId_stepIndex: slot },
     create: {
       workflowId: step.workflowId,
       stepIndex: step.stepIndex,
@@ -60,6 +71,9 @@ export async function runIdempotent<T>(
       attempts: 1,
     },
     update: {
+      tool: step.tool,
+      args: step.args as object,
+      idempotencyKey,
       status: "running",
       attempts: { increment: 1 },
     },

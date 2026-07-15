@@ -5,6 +5,9 @@ import { Plan } from "../planner/plan";
 // be a second NotifierPort implementation behind the same interface later.
 export interface NotifierPort {
   sendApprovalRequest(workflowId: string, plan: Plan): Promise<{ messageRef: string }>;
+  // SPEC.md §7: "Step failure after retries -> workflow FAILED, remaining
+  // steps skipped, notifier gets a failure summary with partial results."
+  sendFailureSummary(workflowId: string, failedStep: string, error: string): Promise<void>;
 }
 
 function summarizeArgs(args: Record<string, unknown>): string {
@@ -67,6 +70,34 @@ export class TelegramNotifier implements NotifierPort {
 
     const data = (await res.json()) as TelegramSendMessageResponse;
     return { messageRef: String(data.result.message_id) };
+  }
+
+  async sendFailureSummary(workflowId: string, failedStep: string, error: string): Promise<void> {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) {
+      throw new Error("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID is not set");
+    }
+
+    const text = [
+      `Workflow ${workflowId} failed`,
+      "",
+      `Failed step: ${failedStep}`,
+      `Error: ${error}`,
+      "",
+      "Remaining steps were skipped. Partial results are in the audit log.",
+    ].join("\n");
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+
+    if (!res.ok) {
+      const responseText = await res.text();
+      throw new Error(`Telegram sendMessage failed (${res.status}): ${responseText}`);
+    }
   }
 }
 

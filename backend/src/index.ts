@@ -5,6 +5,7 @@ import healthRouter from "./routes/health";
 import hubspotRouter from "./routes/hubspot";
 import internalRouter from "./routes/internal";
 import slackRouter from "./routes/slack";
+import statsRouter from "./routes/stats";
 import telegramRouter from "./routes/telegram";
 import webhooksRouter from "./routes/webhooks";
 
@@ -27,6 +28,7 @@ app.use(telegramRouter);
 app.use(slackRouter);
 app.use(internalRouter);
 app.use(approvalRouter);
+app.use(statsRouter);
 
 app.listen(port, () => {
   console.log(`OpsAgent backend listening on port ${port}`);

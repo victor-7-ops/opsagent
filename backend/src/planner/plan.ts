@@ -6,6 +6,11 @@ export const PlanStepSchema = z.object({
   args: z.record(z.unknown()),
   rationale: z.string().max(300),
   depends_on: z.array(z.number().int()).default([]),
+  // Reserved per SPEC.md §6: an approver's edit to this step's args, made
+  // before approval (Issue 14 — "stretch", but implemented). `args` stays
+  // the LLM's original proposal; `edited_args`, when present, is what the
+  // executor must actually run.
+  edited_args: z.record(z.unknown()).optional(),
 });
 
 export const PlanSchema = z.object({

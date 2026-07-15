@@ -17,7 +17,8 @@ type AuditEvent =
     }
   | { event: "step_started"; detail: { tool: string; args: Record<string, unknown>; idempotencyKey: string } }
   | { event: "step_executed"; detail: { tool: string; result: unknown } }
-  | { event: "step_failed"; detail: { tool: string; error: string } };
+  | { event: "step_failed"; detail: { tool: string; error: string } }
+  | { event: "plan_edited"; detail: { stepIndex: number; args: Record<string, unknown>; by: string } };
 
 interface WriteAuditLogArgs {
   workflowId: string | null;

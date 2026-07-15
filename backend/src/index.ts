@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import approvalRouter from "./routes/approval";
 import healthRouter from "./routes/health";
 import hubspotRouter from "./routes/hubspot";
 import internalRouter from "./routes/internal";
@@ -23,7 +24,7 @@ app.use(hubspotRouter);
 app.use(webhooksRouter);
 app.use(telegramRouter);
 app.use(internalRouter);
-app.use(internalRouter);
+app.use(approvalRouter);
 
 app.listen(port, () => {
   console.log(`OpsAgent backend listening on port ${port}`);

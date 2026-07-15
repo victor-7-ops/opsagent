@@ -1,8 +1,8 @@
 import { Plan } from "../planner/plan";
 
-// SPEC.md §6 — one implementation behind NotifierPort, config NOTIFIER=slack|telegram.
-// Only Telegram is wired in v2.0 (Issue 11 explicitly picks one); Slack would
-// be a second NotifierPort implementation behind the same interface later.
+// SPEC.md §6 — NOTIFIER=slack|telegram selects the implementation behind
+// this single interface. Telegram (Issue 11) and Slack were both built;
+// SPEC.md only required picking one, but both are real, tested implementations.
 export interface NotifierPort {
   sendApprovalRequest(workflowId: string, plan: Plan): Promise<{ messageRef: string }>;
   // SPEC.md §7: "Step failure after retries -> workflow FAILED, remaining
@@ -101,8 +101,85 @@ export class TelegramNotifier implements NotifierPort {
   }
 }
 
+interface SlackPostMessageResponse {
+  ok: boolean;
+  ts?: string;
+  error?: string;
+}
+
+// Slack: Block Kit + interactivity endpoint (SPEC.md §6). Buttons carry
+// action_id "approve"/"reject" and value=workflowId — parsed by the
+// interactivity callback handler (routes/slack.ts).
+export class SlackNotifier implements NotifierPort {
+  async sendApprovalRequest(workflowId: string, plan: Plan): Promise<{ messageRef: string }> {
+    const token = process.env.SLACK_BOT_TOKEN;
+    const channel = process.env.SLACK_CHANNEL_ID;
+    if (!token || !channel) {
+      throw new Error("SLACK_BOT_TOKEN / SLACK_CHANNEL_ID is not set");
+    }
+
+    const stepLines = plan.steps
+      .map((step, i) => `${i + 1}. \`${step.tool}\` (${summarizeArgs(step.args)})`)
+      .join("\n");
+
+    const blocks = [
+      { type: "section", text: { type: "mrkdwn", text: `*New workflow plan awaiting approval*\n${plan.human_summary}` } },
+      { type: "section", text: { type: "mrkdwn", text: `*Risk level:* ${plan.risk_level}\n*Steps:*\n${stepLines}` } },
+      {
+        type: "actions",
+        elements: [
+          { type: "button", text: { type: "plain_text", text: "✅ Approve" }, style: "primary", action_id: "approve", value: workflowId },
+          { type: "button", text: { type: "plain_text", text: "❌ Reject" }, style: "danger", action_id: "reject", value: workflowId },
+        ],
+      },
+    ];
+
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text: renderApprovalMessage(plan), blocks }),
+    });
+
+    const data = (await res.json()) as SlackPostMessageResponse;
+    if (!res.ok || !data.ok) {
+      throw new Error(`Slack chat.postMessage failed: ${data.error ?? res.status}`);
+    }
+
+    return { messageRef: data.ts! };
+  }
+
+  async sendFailureSummary(workflowId: string, failedStep: string, error: string): Promise<void> {
+    const token = process.env.SLACK_BOT_TOKEN;
+    const channel = process.env.SLACK_CHANNEL_ID;
+    if (!token || !channel) {
+      throw new Error("SLACK_BOT_TOKEN / SLACK_CHANNEL_ID is not set");
+    }
+
+    const text = [
+      `Workflow ${workflowId} failed`,
+      "",
+      `Failed step: ${failedStep}`,
+      `Error: ${error}`,
+      "",
+      "Remaining steps were skipped. Partial results are in the audit log.",
+    ].join("\n");
+
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text }),
+    });
+
+    const data = (await res.json()) as SlackPostMessageResponse;
+    if (!res.ok || !data.ok) {
+      throw new Error(`Slack chat.postMessage failed: ${data.error ?? res.status}`);
+    }
+  }
+}
+
 export function getNotifier(): NotifierPort {
   const kind = process.env.NOTIFIER || "telegram";
   if (kind === "telegram") return new TelegramNotifier();
-  throw new Error(`Notifier "${kind}" is not implemented — only "telegram" is wired in v2.0`);
+  if (kind === "slack") return new SlackNotifier();
+  throw new Error(`Notifier "${kind}" is not implemented`);
 }

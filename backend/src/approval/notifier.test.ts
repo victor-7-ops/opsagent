@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Plan } from "../planner/plan";
-import { getNotifier, renderApprovalMessage, TelegramNotifier } from "./notifier";
+import { getNotifier, renderApprovalMessage, SlackNotifier, TelegramNotifier } from "./notifier";
 
 const SAMPLE_PLAN: Plan = {
   goal: "Route lead",
@@ -98,6 +98,66 @@ describe("TelegramNotifier", () => {
   });
 });
 
+describe("SlackNotifier", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.SLACK_BOT_TOKEN = "xoxb-test";
+    process.env.SLACK_CHANNEL_ID = "C123";
+  });
+
+  it("posts Block Kit with Approve/Reject buttons and returns the message ts", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true, ts: "1234.5678" }) });
+
+    const notifier = new SlackNotifier();
+    const result = await notifier.sendApprovalRequest("wf-1", SAMPLE_PLAN);
+
+    expect(result).toEqual({ messageRef: "1234.5678" });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://slack.com/api/chat.postMessage");
+    expect(options.headers.Authorization).toBe("Bearer xoxb-test");
+    const body = JSON.parse(options.body);
+    expect(body.channel).toBe("C123");
+    const actionsBlock = body.blocks.find((b: { type: string }) => b.type === "actions");
+    expect(actionsBlock.elements).toEqual([
+      expect.objectContaining({ action_id: "approve", value: "wf-1" }),
+      expect.objectContaining({ action_id: "reject", value: "wf-1" }),
+    ]);
+  });
+
+  it("throws when SLACK_BOT_TOKEN is missing", async () => {
+    delete process.env.SLACK_BOT_TOKEN;
+    const notifier = new SlackNotifier();
+    await expect(notifier.sendApprovalRequest("wf-1", SAMPLE_PLAN)).rejects.toThrow(
+      "SLACK_BOT_TOKEN / SLACK_CHANNEL_ID is not set",
+    );
+  });
+
+  it("throws on a Slack API-level error (ok:false in a 200 response)", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: false, error: "channel_not_found" }) });
+    const notifier = new SlackNotifier();
+    await expect(notifier.sendApprovalRequest("wf-1", SAMPLE_PLAN)).rejects.toThrow(
+      "Slack chat.postMessage failed: channel_not_found",
+    );
+  });
+
+  it("sendFailureSummary posts a plain text message", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true, ts: "1" }) });
+    const notifier = new SlackNotifier();
+    await notifier.sendFailureSummary("wf-1", "email.send", "boom");
+
+    const [, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.text).toContain("wf-1");
+    expect(body.text).toContain("email.send");
+    expect(body.text).toContain("boom");
+    expect(body.blocks).toBeUndefined();
+  });
+});
+
 describe("getNotifier", () => {
   it("defaults to Telegram when NOTIFIER is unset", () => {
     delete process.env.NOTIFIER;
@@ -109,8 +169,13 @@ describe("getNotifier", () => {
     expect(getNotifier()).toBeInstanceOf(TelegramNotifier);
   });
 
-  it("throws for an unimplemented notifier kind (e.g. slack)", () => {
+  it("returns a SlackNotifier when NOTIFIER=slack", () => {
     process.env.NOTIFIER = "slack";
-    expect(() => getNotifier()).toThrow('Notifier "slack" is not implemented');
+    expect(getNotifier()).toBeInstanceOf(SlackNotifier);
+  });
+
+  it("throws for an unimplemented notifier kind", () => {
+    process.env.NOTIFIER = "carrier-pigeon";
+    expect(() => getNotifier()).toThrow('Notifier "carrier-pigeon" is not implemented');
   });
 });

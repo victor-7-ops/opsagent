@@ -4,6 +4,7 @@ import approvalRouter from "./routes/approval";
 import healthRouter from "./routes/health";
 import hubspotRouter from "./routes/hubspot";
 import internalRouter from "./routes/internal";
+import slackRouter from "./routes/slack";
 import telegramRouter from "./routes/telegram";
 import webhooksRouter from "./routes/webhooks";
 
@@ -23,6 +24,7 @@ app.use(healthRouter);
 app.use(hubspotRouter);
 app.use(webhooksRouter);
 app.use(telegramRouter);
+app.use(slackRouter);
 app.use(internalRouter);
 app.use(approvalRouter);
 

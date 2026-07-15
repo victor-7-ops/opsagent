@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { writeAuditLog } from "../workflow/audit";
 import { Plan, PlanSchema } from "./plan";
+import { queryPolicyDocs } from "./rag";
 import { registryAsJsonSchema } from "./toolRegistry";
 
 const PLANNER_MODEL = "claude-sonnet-5";
@@ -117,4 +118,24 @@ export async function generatePlan(input: PlannerInput): Promise<Plan> {
   });
 
   throw new PlannerDeadLetterError(input.workflowId, MAX_ATTEMPTS, lastError?.message ?? "unknown error");
+}
+
+interface PlanWorkflowInput {
+  workflowId: string;
+  triggerPayload: unknown;
+  ragQuery?: string; // defaults to a stringified triggerPayload
+}
+
+// Wraps generatePlan() with RAG retrieval (SPEC.md §5.2: "RAG-retrieved
+// policy docs (top 4 chunks)"). Kept separate from generatePlan so the core
+// planner stays trivially testable with an explicit ragChunks array.
+export async function planWorkflow(input: PlanWorkflowInput): Promise<Plan> {
+  const ragQuery = input.ragQuery ?? JSON.stringify(input.triggerPayload);
+  const ragChunks = await queryPolicyDocs(ragQuery);
+
+  return generatePlan({
+    workflowId: input.workflowId,
+    triggerPayload: input.triggerPayload,
+    ragChunks,
+  });
 }

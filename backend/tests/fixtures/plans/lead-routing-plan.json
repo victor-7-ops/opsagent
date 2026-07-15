@@ -1,0 +1,23 @@
+{
+  "goal": "Acknowledge inbound pricing inquiry and draft a personalized reply",
+  "risk_level": "low",
+  "steps": [
+    {
+      "tool": "hubspot.get_contact",
+      "args": { "contactId": "hs-contact-42" },
+      "rationale": "Resolve existing contact context before replying",
+      "depends_on": []
+    },
+    {
+      "tool": "email.draft",
+      "args": {
+        "to": "lead@example.com",
+        "subject": "Re: Interested in pricing",
+        "body": "Hi, thanks for reaching out! I've attached our pricing info below and I'm happy to answer any questions."
+      },
+      "rationale": "Draft a reply for human review before sending",
+      "depends_on": [0]
+    }
+  ],
+  "human_summary": "New inbound email asking about pricing. Plan: look up the contact, then draft a reply for approval. No email will be sent automatically."
+}

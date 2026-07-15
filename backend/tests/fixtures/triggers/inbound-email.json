@@ -1,0 +1,8 @@
+{
+  "type": "inbound_email",
+  "contactId": "hs-contact-42",
+  "from": "lead@example.com",
+  "subject": "Interested in pricing",
+  "body": "Hi, can you send over your pricing info? We're evaluating a few vendors.",
+  "receivedAt": "2026-07-20T10:00:00Z"
+}

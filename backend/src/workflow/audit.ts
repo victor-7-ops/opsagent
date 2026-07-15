@@ -13,7 +13,7 @@ type AuditEvent =
   | { event: "plan_rejected"; detail: { reason: string } }
   | {
       event: "approval_decision";
-      detail: { decision: "approved" | "rejected" | "expired"; by?: string; reason?: string };
+      detail: { decision: "approved" | "rejected" | "expired" | "unauthorized"; by?: string; reason?: string };
     }
   | { event: "step_started"; detail: { tool: string; args: Record<string, unknown>; idempotencyKey: string } }
   | { event: "step_executed"; detail: { tool: string; result: unknown } }

@@ -1,0 +1,60 @@
+{
+  "name": "OpsAgent v2 - Approval Expiry Sweep",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.OPSAGENT_BACKEND_URL}}/internal/workflows/expire-sweep",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Api-Key",
+              "value": "={{$env.INTERNAL_API_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-request",
+      "name": "Call expire-sweep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 min": {
+      "main": [
+        [
+          {
+            "node": "Call expire-sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

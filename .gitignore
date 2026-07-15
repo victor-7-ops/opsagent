@@ -6,3 +6,4 @@ dist/
 *.log
 hubspot.config.yml
 .hscli/
+repomix-output.xml

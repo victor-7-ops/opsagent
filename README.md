@@ -28,10 +28,14 @@ inbound trigger → AgentPlanner (Claude, structured JSON plan) → WorkflowEngi
 **Core invariant: no side effect — HubSpot write, email send, ticket update — ever executes without an approved plan.** Enforced in code (executor path), not prompts.
 
 - State machine: `TRIAGED → PLANNED → AWAITING_APPROVAL → APPROVED → EXECUTING → DONE`, with `REJECTED`/`EXPIRED`/`FAILED` branches, every transition audited
-- Planner: Claude emits a validated, tool-scoped JSON plan (zod-checked) — never calls tools directly, only proposes them
-- Approval gate: plan rendered as a human-readable summary with Approve/Reject in Slack or Telegram
-- Executor: idempotent, retry-with-backoff, replay-safe — re-running is always a no-op for completed steps
-- Feature flag `WORKFLOW_MODE=direct|gated` — safe rollback to v1 behavior, and a clean side-by-side demo
+- Planner: Claude emits a validated, tool-scoped JSON plan (zod-checked), grounded with RAG-retrieved policy docs (ChromaDB) — never calls tools directly, only proposes them
+- Validator: rejects unknown tools, schema violations, `maxPerPlan` overages, dependency cycles, unresolved entity IDs, and any `risk_level=high` plan outright
+- Approval gate: plan rendered as a human-readable summary with Approve/Reject buttons in **Telegram or Slack** (both real, switchable via `NOTIFIER=telegram|slack`); allowlisted approvers only, non-allowlisted clicks are ignored + audited; a stretch feature (per-step arg editing before approval) is implemented too
+- 24h approval timeout → `EXPIRED`, swept by a scheduled n8n job
+- Executor: idempotent (re-running is always a no-op for completed steps), retried with 1s/4s/16s backoff on network/5xx only, halts and notifies on failure — real HubSpot API calls for contact/deal/note operations, ticket updates against the live `tickets` table
+- `GET /stats`: workflow counts by state + approval latency
+
+**Real gap, not hidden:** no email provider is integrated anywhere in this project. `email.draft`/`email.send` are honestly recorded to `activity_log` — `email.send` is explicitly flagged `simulated`, not claiming real delivery.
 
 ## Stack
 
@@ -43,7 +47,14 @@ Node.js 20 · TypeScript (strict) · Express · Prisma/Postgres · Claude API (A
 - [ ] v1 Phase 1 remainder: follow-up drafting, deal-stage delayed follow-up, failure alerting
 - [ ] v1 Phase 2: ticket triage, RAG knowledge base, escalation flagging, SLA monitor
 - [ ] v1 Phase 3: dashboard, deployment
-- [ ] v2: workflow state machine, agent planner, approval gate, executor (see [SPEC.md](SPEC.md) / [BUILDPLAN.md](BUILDPLAN.md))
+- [x] v2 Milestone 1 — Workflow State Machine: schema, `WorkflowEngine`, idempotency, audit log
+- [x] v2 Milestone 2 — Agent Planner: tool registry, planner + retry/dead-letter, RAG injection, validator, integration test
+- [x] v2 Milestone 3 — Approval Gate: Telegram + Slack notifiers, callback handlers, expiry sweep, plan-editing (stretch)
+- [x] v2 Milestone 4 — Executor: real tool implementations, idempotent/retrying executor, `GET /stats`
+- [ ] Slack live-verification (code complete + tested, not yet run against a real Slack app)
+- [ ] Demo script / Loom walkthrough (BUILDPLAN Issue 18) — skipped for now
+
+227 backend tests passing (`cd backend && npm test`). See [SPEC.md](SPEC.md) / [BUILDPLAN.md](BUILDPLAN.md) for the full v2 design and issue breakdown.
 
 v1 build history and original spec: [`docs/v1/`](docs/v1/).
 
